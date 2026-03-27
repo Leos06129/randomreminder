@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 
 void main() {
   runApp(const RandomReminderApp());
@@ -45,9 +47,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   double _fontSize = 24.0;
   Color _textColor = Colors.black;
   
-  Timer? _notificationTimer;
+  static const _notificationChannelId = 'reminder_channel';
+  static const _notificationChannelName = '随机提醒';
+  static const _notificationChannelDesc = '随机提醒通知';
+  
+  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  
   Timer? _fullScreenTimer;
-  bool _isShowingFullScreen = false;
 
   final List<String> _fontFamilies = [
     'Default', 'serif', 'monospace', 'cursive', 'fantasy'
@@ -74,48 +80,52 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _line1Controller.dispose();
     _line2Controller.dispose();
     _line3Controller.dispose();
-    _notificationTimer?.cancel();
     _fullScreenTimer?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // App 回到前台
-      if (_isShowingFullScreen) {
-        _dismissFullScreen();
-      }
-    }
+    // App 在后台时也要保持提醒
   }
 
   Future<void> _initNotifications() async {
-    final FlutterLocalNotificationsPlugin notifications =
-        FlutterLocalNotificationsPlugin();
+    // 初始化时区
+    tz_data.initializeTimeZones();
     
-    // 创建通知渠道（Android 8.0+）
-    const androidChannel = AndroidNotificationChannel(
-      'reminder_channel',
-      '随机提醒',
-      description: '随机提醒通知',
-      importance: Importance.high,
-    );
-    
-    await notifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(androidChannel);
-    
+    // Android 设置
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidSettings);
     
-    await notifications.initialize(
+    await _notifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
+    
+    // 创建通知渠道（重要：锁屏通知需要高优先级渠道）
+    const androidChannel = AndroidNotificationChannel(
+      _notificationChannelId,
+      _notificationChannelName,
+      description: _notificationChannelDesc,
+      importance: Importance.max,
+      priority: Priority.max,
+      playSound: true,
+      enableVibration: true,
+      enableLights: true,
+    );
+    
+    await _notifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(androidChannel);
+    
+    // 请求通知权限（Android 13+）
+    await _notifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
   }
 
   void _onNotificationTap(NotificationResponse response) {
-    // 点击通知时的处理
+    // 点击通知时打开应用
   }
 
   Future<void> _loadSettings() async {
@@ -150,9 +160,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _stopReminder() async {
-    final FlutterLocalNotificationsPlugin notifications =
-        FlutterLocalNotificationsPlugin();
-    await notifications.cancelAll();
+    await _notifications.cancelAll();
     _fullScreenTimer?.cancel();
     setState(() {
       _isRunning = false;
@@ -169,72 +177,98 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     setState(() {});
 
-    // 设置定时通知
-    _notificationTimer = Timer(Duration(minutes: minutes), () {
-      if (_isRunning) {
-        _showFullScreenNotification();
-      }
-    });
+    // 计算提醒时间
+    final scheduledTime = DateTime.now().add(Duration(minutes: minutes));
+    
+    // 创建全屏通知设置（锁屏唤醒屏幕）
+    final androidDetails = AndroidNotificationDetails(
+      _notificationChannelId,
+      _notificationChannelName,
+      channelDescription: _notificationChannelDesc,
+      importance: Importance.max,
+      priority: Priority.max,
+      fullScreenIntent: true,  // 关键：全屏意图，锁屏时唤醒屏幕
+      category: AndroidNotificationCategory.alarm,
+      timeoutAfter: 5000,       // 5秒后自动消失
+      autoCancel: true,
+      playSound: true,
+      enableVibration: true,
+      visibility: NotificationVisibility.public,
+      styleInformation: BigTextStyleInformation(
+        '${_line1Controller.text}\n${_line2Controller.text}\n${_line3Controller.text}',
+        contentTitle: '提醒',
+        summaryText: '点击查看详情',
+      ),
+    );
+
+    final details = NotificationDetails(android: androidDetails);
+
+    // 使用 zonedSchedule 来定时提醒
+    try {
+      await _notifications.zonedSchedule(
+        0,
+        '提醒',
+        '${_line1Controller.text}\n${_line2Controller.text}\n${_line3Controller.text}',
+        _convertToTZDateTime(scheduledTime),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+    } catch (e) {
+      // 如果 zonedSchedule 失败，使用延时显示通知
+      Timer(Duration(minutes: minutes), () {
+        if (_isRunning) {
+          _showFullScreenNotification();
+        }
+      });
+    }
+  }
+
+  // 转换 DateTime 到 TZDateTime
+  tz.TZDateTime _convertToTZDateTime(DateTime dateTime) {
+    final location = tz.local;
+    return tz.TZDateTime.from(dateTime, location);
   }
 
   void _showFullScreenNotification() async {
     if (!_isRunning) return;
 
-    final FlutterLocalNotificationsPlugin notifications =
-        FlutterLocalNotificationsPlugin();
-
-    // 显示全屏通知
-    const androidDetails = AndroidNotificationDetails(
-      'reminder_channel',
-      '随机提醒',
-      channelDescription: '随机提醒通知',
+    // 全屏通知设置
+    final androidDetails = AndroidNotificationDetails(
+      _notificationChannelId,
+      _notificationChannelName,
+      channelDescription: _notificationChannelDesc,
       importance: Importance.max,
       priority: Priority.max,
-      fullScreenIntent: true,
+      fullScreenIntent: true,  // 锁屏时唤醒屏幕
       category: AndroidNotificationCategory.alarm,
-      timeoutAfter: 5000, // 5秒后自动消失
+      timeoutAfter: 5000,
       autoCancel: true,
+      playSound: true,
+      enableVibration: true,
+      visibility: NotificationVisibility.public,
+      styleInformation: BigTextStyleInformation(
+        '${_line1Controller.text}\n${_line2Controller.text}\n${_line3Controller.text}',
+        contentTitle: '提醒',
+        summaryText: '点击查看详情',
+      ),
     );
 
-    const details = NotificationDetails(android: androidDetails);
+    final details = NotificationDetails(android: androidDetails);
 
-    // 显示通知
-    await notifications.show(
+    // 显示通知（这会唤醒锁屏屏幕）
+    await _notifications.show(
       0,
       '提醒',
       '${_line1Controller.text}\n${_line2Controller.text}\n${_line3Controller.text}',
       details,
     );
 
-    // 亮屏并显示全屏界面
-    _showFullScreenOverlay();
-
-    // 5秒后自动进入下一次提醒（锁屏状态）
+    // 5秒后自动进入下一次提醒
     _fullScreenTimer = Timer(const Duration(seconds: 5), () {
-      _dismissFullScreen();
-      _scheduleNextReminder();
+      if (_isRunning) {
+        _scheduleNextReminder();
+      }
     });
-  }
-
-  void _showFullScreenOverlay() {
-    if (!_isRunning) return;
-    
-    setState(() {
-      _isShowingFullScreen = true;
-    });
-    
-    // 唤醒屏幕
-    SystemChannels.platform.invokeMethod('SystemChrome.setEnabledSystemUIMode', 'immersiveSticky');
-  }
-
-  void _dismissFullScreen() {
-    if (!_isShowingFullScreen) return;
-    
-    setState(() {
-      _isShowingFullScreen = false;
-    });
-    
-    _fullScreenTimer?.cancel();
   }
 
   void _showFontSettings() {
@@ -262,6 +296,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   onSelected: (selected) {
                     setState(() => _fontFamily = font);
                     _saveSettings();
+                    Navigator.pop(context);
                   },
                 );
               }).toList(),
@@ -281,6 +316,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   onSelected: (selected) {
                     setState(() => _fontSize = size);
                     _saveSettings();
+                    Navigator.pop(context);
                   },
                 );
               }).toList(),
@@ -298,6 +334,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   onTap: () {
                     setState(() => _textColor = color);
                     _saveSettings();
+                    Navigator.pop(context);
                   },
                   child: Container(
                     width: 40,
@@ -324,60 +361,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // 全屏提醒覆盖层
-    if (_isShowingFullScreen && _isRunning) {
-      return Scaffold(
-        backgroundColor: Colors.black.withOpacity(0.9),
-        body: GestureDetector(
-          onTap: _dismissFullScreen,
-          child: Container(
-            color: Colors.black87,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _line1Controller.text,
-                    style: TextStyle(
-                      fontFamily: _fontFamily == 'Default' ? null : _fontFamily,
-                      fontSize: _fontSize,
-                      color: _textColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    _line2Controller.text,
-                    style: TextStyle(
-                      fontFamily: _fontFamily == 'Default' ? null : _fontFamily,
-                      fontSize: _fontSize,
-                      color: _textColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    _line3Controller.text,
-                    style: TextStyle(
-                      fontFamily: _fontFamily == 'Default' ? null : _fontFamily,
-                      fontSize: _fontSize,
-                      color: _textColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 40),
-                  Text(
-                    '5秒后自动进入下一次提醒',
-                    style: TextStyle(color: Colors.white54, fontSize: 14),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('随机提醒小程序'),
@@ -536,10 +519,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 5),
+            const Text('• 首次使用需允许通知权限'),
             const Text('• 点击"开始随机提醒"后，每隔1-4分钟随机弹出提醒'),
-            const Text('• 前台运行时：提醒显示3秒后自动消失'),
-            const Text('• 锁屏状态下：亮屏显示提醒5秒后自动进入下次提醒'),
+            const Text('• 锁屏状态下会亮屏显示提醒'),
             const Text('• 点击右上角图标可设置字体、大小、颜色'),
+            const Text('• 请确保手机没有限制应用后台运行'),
           ],
         ),
       ),
