@@ -91,7 +91,7 @@ class _HomePageState extends State<HomePage> {
     if (!_isRunning) return;
 
     final random = Random();
-    final minutes = random.nextInt(4) + 1; // 1-4分钟
+    final minutes = random.nextInt(4) + 1;
     _nextReminderMinutes = minutes;
 
     final FlutterLocalNotificationsPlugin notifications =
@@ -103,30 +103,19 @@ class _HomePageState extends State<HomePage> {
       channelDescription: '随机提醒通知',
       importance: Importance.high,
       priority: Priority.high,
-      fullScreenIntent: true,
-      category: AndroidNotificationCategory.reminder,
-      enableLights: true,
-      ledColor: Colors.blue,
-      ledOnMs: 1000,
-      ledOffMs: 500,
     );
 
     const details = NotificationDetails(android: androidDetails);
 
-    // 显示提醒
-    await notifications.zonedSchedule(
+    await notifications.show(
       0,
       '提醒',
       '${_line1Controller.text}\n${_line2Controller.text}\n${_line3Controller.text}',
-      DateTime.now().add(Duration(minutes: minutes)),
       details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: null,
     );
 
     setState(() {});
 
-    // 设置下一次提醒
     Future.delayed(Duration(minutes: minutes), () {
       if (_isRunning) {
         _showFullScreenNotification();
@@ -145,9 +134,6 @@ class _HomePageState extends State<HomePage> {
       channelDescription: '随机提醒通知',
       importance: Importance.max,
       priority: Priority.max,
-      fullScreenIntent: true,
-      category: AndroidNotificationCategory.reminder,
-      fullScreenShowAction: true,
     );
 
     const details = NotificationDetails(android: androidDetails);
