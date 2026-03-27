@@ -108,7 +108,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _notificationChannelName,
       description: _notificationChannelDesc,
       importance: Importance.max,
-      priority: Priority.max,
       playSound: true,
       enableVibration: true,
       enableLights: true,
@@ -186,7 +185,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _notificationChannelName,
       channelDescription: _notificationChannelDesc,
       importance: Importance.max,
-      priority: Priority.max,
       fullScreenIntent: true,  // 关键：全屏意图，锁屏时唤醒屏幕
       category: AndroidNotificationCategory.alarm,
       timeoutAfter: 5000,       // 5秒后自动消失
@@ -212,6 +210,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _convertToTZDateTime(scheduledTime),
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       );
     } catch (e) {
       // 如果 zonedSchedule 失败，使用延时显示通知
