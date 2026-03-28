@@ -12,13 +12,14 @@ import io.flutter.plugin.common.MethodChannel;
 
 /**
  * 全屏提醒 Activity
- * 通过 notification 的 fullScreenIntent 启动，实现锁屏时全屏弹出
+ * 通过 notification 的 fullScreenIntent 或 AndroidIntent 启动
+ * 锁屏和未锁屏时都能全屏弹出
  */
 public class FullScreenActivity extends FlutterActivity {
     
     public static final String EXTRA_FULLSCREEN = "extra_fullscreen";
     public static boolean isFullScreenLaunch = false;
-    private static final String CHANNEL = "com.example.randomreminder/launch";
+    private static final String CHANNEL = "com.reminder.randomreminder/launch";
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,14 +30,16 @@ public class FullScreenActivity extends FlutterActivity {
             isFullScreenLaunch = true;
         }
         
-        // 全屏配置
+        // 全屏配置 - 关键：允许在后台启动
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Window window = getWindow();
             window.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON |
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
             );
         } else {
             @SuppressWarnings("deprecation")
@@ -44,7 +47,9 @@ public class FullScreenActivity extends FlutterActivity {
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON |
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
             );
         }
     }
