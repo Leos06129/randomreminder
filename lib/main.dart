@@ -7,8 +7,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart'
     as fln;
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:flutter_local_notifications_platform_interface.dart'
-    show AndroidIntent;
 
 // 方法通道，用于获取 Android 启动参数
 const MethodChannel _launchChannel = MethodChannel('com.reminder.randomreminder/launch');
@@ -98,14 +96,6 @@ class ReminderTaskHandler extends TaskHandler {
     final line1 = prefs.getString('line1') ?? '时时彻知无常';
     final line2 = prefs.getString('line2') ?? '刻刻精勤觉知';
 
-    // 创建指向 FullScreenActivity 的全屏 Intent
-    final fullScreenAndroidIntent = AndroidIntent(
-      action: 'android.intent.action.MAIN',
-      package: 'com.reminder.randomreminder',
-      className: 'com.reminder.randomreminder.FullScreenActivity',
-      arguments: {'extra_fullscreen': true},
-    );
-    
     // 创建全屏通知配置
     final styleInfo = fln.BigTextStyleInformation(
       '$line1\n$line2',
@@ -118,7 +108,7 @@ class ReminderTaskHandler extends TaskHandler {
       channelDescription: '随机提醒全屏通知',
       importance: fln.Importance.max,
       priority: fln.Priority.max,  // 最高优先级
-      fullScreenIntent: fullScreenAndroidIntent,  // 全屏意图，锁屏时唤屏
+      fullScreenIntent: true,  // 全屏意图，锁屏时唤屏
       category: fln.AndroidNotificationCategory.alarm,
       visibility: fln.NotificationVisibility.public,
       timeoutAfter: 5000,
