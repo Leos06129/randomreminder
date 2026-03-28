@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart'
     as fln;
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:android_intent_plus/android_intent.dart';
 
 // 方法通道，用于获取 Android 启动参数
 const MethodChannel _launchChannel = MethodChannel('com.reminder.randomreminder/launch');
@@ -95,6 +96,22 @@ class ReminderTaskHandler extends TaskHandler {
     final prefs = await SharedPreferences.getInstance();
     final line1 = prefs.getString('line1') ?? '时时彻知无常';
     final line2 = prefs.getString('line2') ?? '刻刻精勤觉知';
+
+    // 保存提醒内容到 SharedPreferences，供全屏页面读取
+    await prefs.setString('reminder_line1', line1);
+    await prefs.setString('reminder_line2', line2);
+
+    // 尝试启动全屏 Activity（未锁屏时有效）
+    try {
+      final intent = AndroidIntent(
+        action: 'android.intent.action.MAIN',
+        componentName: 'com.reminder.randomreminder/com.reminder.randomreminder.FullScreenActivity',
+        extra: {'extra_fullscreen': true},
+      );
+      await intent.launch();
+    } catch (e) {
+      // 忽略启动错误，可能应用在前台
+    }
 
     // 创建全屏通知配置
     final styleInfo = fln.BigTextStyleInformation(
