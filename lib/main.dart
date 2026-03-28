@@ -96,9 +96,13 @@ class ReminderTaskHandler extends TaskHandler {
     final line1 = prefs.getString('line1') ?? '记得喝水 💧';
     final line2 = prefs.getString('line2') ?? '站起来活动一下 🚶';
 
-    // 创建指向 FullScreenActivity 的 fullScreenIntent
-    // 使用 Android 的 Intent 来构建
-    const androidDetails = fln.AndroidNotificationDetails(
+    // 创建全屏通知配置
+    final styleInfo = fln.BigTextStyleInformation(
+      '$line1\n$line2',
+      contentTitle: '提醒',
+    );
+    
+    final androidDetails = fln.AndroidNotificationDetails(
       'reminder_channel',
       '随机提醒',
       channelDescription: '随机提醒全屏通知',
@@ -111,10 +115,7 @@ class ReminderTaskHandler extends TaskHandler {
       autoCancel: true,
       playSound: true,
       enableVibration: true,
-      styleInformation: fln.BigTextStyleInformation(
-        '$line1\n$line2',
-        contentTitle: '提醒',
-      ),
+      styleInformation: styleInfo,
     );
 
     await _notifications.show(
