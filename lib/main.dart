@@ -7,6 +7,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart'
     as fln;
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:flutter_local_notifications_platform_interface.dart'
+    show AndroidIntent;
 
 // 方法通道，用于获取 Android 启动参数
 const MethodChannel _launchChannel = MethodChannel('com.reminder.randomreminder/launch');
@@ -93,9 +95,17 @@ class ReminderTaskHandler extends TaskHandler {
 
   Future<void> _fireReminder() async {
     final prefs = await SharedPreferences.getInstance();
-    final line1 = prefs.getString('line1') ?? '记得喝水 💧';
-    final line2 = prefs.getString('line2') ?? '站起来活动一下 🚶';
+    final line1 = prefs.getString('line1') ?? '时时彻知无常';
+    final line2 = prefs.getString('line2') ?? '刻刻精勤觉知';
 
+    // 创建指向 FullScreenActivity 的全屏 Intent
+    final fullScreenAndroidIntent = AndroidIntent(
+      action: 'android.intent.action.MAIN',
+      package: 'com.reminder.randomreminder',
+      className: 'com.reminder.randomreminder.FullScreenActivity',
+      arguments: {'extra_fullscreen': true},
+    );
+    
     // 创建全屏通知配置
     final styleInfo = fln.BigTextStyleInformation(
       '$line1\n$line2',
@@ -108,7 +118,7 @@ class ReminderTaskHandler extends TaskHandler {
       channelDescription: '随机提醒全屏通知',
       importance: fln.Importance.max,
       priority: fln.Priority.max,  // 最高优先级
-      fullScreenIntent: true,       // 全屏意图，锁屏时唤屏
+      fullScreenIntent: fullScreenAndroidIntent,  // 全屏意图，锁屏时唤屏
       category: fln.AndroidNotificationCategory.alarm,
       visibility: fln.NotificationVisibility.public,
       timeoutAfter: 5000,
@@ -293,8 +303,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _loadSettings() async {
     final p = await SharedPreferences.getInstance();
     setState(() {
-      _line1.text = p.getString('line1') ?? '记得喝水 💧';
-      _line2.text = p.getString('line2') ?? '站起来活动一下 🚶';
+      _line1.text = p.getString('line1') ?? '时时彻知无常';
+      _line2.text = p.getString('line2') ?? '刻刻精勤觉知';
     });
   }
 
@@ -582,8 +592,8 @@ class _ReminderOverlayPageState extends State<ReminderOverlayPage>
     final p = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        _line1 = p.getString('line1') ?? '记得喝水 💧';
-        _line2 = p.getString('line2') ?? '站起来活动一下 🚶';
+        _line1 = p.getString('line1') ?? '时时彻知无常';
+        _line2 = p.getString('line2') ?? '刻刻精勤觉知';
       });
     }
   }
