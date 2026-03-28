@@ -58,7 +58,7 @@ class ReminderTaskHandler extends TaskHandler {
 
   void _scheduleNext() {
     final rng = Random();
-    _waitSeconds = rng.nextInt(41) + 20; // 20~60 秒
+    _waitSeconds = rng.nextInt(31) + 10; // 10~40 秒
     FlutterForegroundTask.updateService(
       notificationTitle: '随机提醒运行中',
       notificationText: '下次提醒：$_waitSeconds 秒后',
@@ -91,12 +91,14 @@ class ReminderTaskHandler extends TaskHandler {
     final line1 = prefs.getString('line1') ?? '记得喝水 💧';
     final line2 = prefs.getString('line2') ?? '站起来活动一下 🚶';
 
+    // 使用高优先级 + fullScreenIntent 实现锁屏全屏弹出
     final androidDetails = fln.AndroidNotificationDetails(
       'reminder_channel',
       '随机提醒',
       channelDescription: '随机提醒全屏通知',
       importance: fln.Importance.max,
-      fullScreenIntent: true,
+      priority: fln.Priority.max,      // 最高优先级
+      fullScreenIntent: true,         // 全屏意图，锁屏时唤屏
       category: fln.AndroidNotificationCategory.alarm,
       visibility: fln.NotificationVisibility.public,
       timeoutAfter: 5000,
@@ -264,8 +266,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _loadSettings() async {
     final p = await SharedPreferences.getInstance();
     setState(() {
-      _line1.text = p.getString('line1') ?? '记得喝水 💧';
-      _line2.text = p.getString('line2') ?? '站起来活动一下 🚶';
+      _line1.text = p.getString('line1') ?? '时时彻知无常！';
+      _line2.text = p.getString('line2') ?? '刻刻精勤觉知！';
     });
   }
 
@@ -324,7 +326,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         if (_countdownSeconds > 0) _countdownSeconds--;
       });
     });
-    setState(() => _countdownSeconds = 40);
+    setState(() => _countdownSeconds = 25);
   }
 
   String _fmt(int s) {
@@ -443,7 +445,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   Text('• 编辑两行提醒文字后点击"保存并开始提醒"',
                       style: TextStyle(
                           color: Colors.white38, fontSize: 13)),
-                  Text('• 每隔 20~60 秒随机弹出全屏提醒',
+                  Text('• 每隔 10~40 秒随机弹出全屏提醒',
                       style: TextStyle(
                           color: Colors.white38, fontSize: 13)),
                   Text('• 后台和锁屏时也会亮屏全屏提醒',
@@ -610,7 +612,8 @@ class _ReminderOverlayPageState extends State<ReminderOverlayPage>
                       fontSize: _fontSize1,
                       fontWeight: FontWeight.bold,
                       shadows: [
-                        Shadow(blurRadius: 12, color: _color1.withOpacity(0.7))
+                        Shadow(
+                            blurRadius: 12, color: _color1.withOpacity(0.7))
                       ],
                     ),
                   ),
@@ -628,7 +631,8 @@ class _ReminderOverlayPageState extends State<ReminderOverlayPage>
                       fontSize: _fontSize2,
                       fontWeight: FontWeight.bold,
                       shadows: [
-                        Shadow(blurRadius: 12, color: _color2.withOpacity(0.7))
+                        Shadow(
+                            blurRadius: 12, color: _color2.withOpacity(0.7))
                       ],
                     ),
                   ),
