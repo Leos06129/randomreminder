@@ -106,7 +106,7 @@ class ReminderTaskHandler extends TaskHandler {
       final intent = AndroidIntent(
         action: 'android.intent.action.MAIN',
         componentName: 'com.reminder.randomreminder/com.reminder.randomreminder.FullScreenActivity',
-        extra: {'extra_fullscreen': true},
+        arguments: {'extra_fullscreen': true},
       );
       await intent.launch();
     } catch (e) {
