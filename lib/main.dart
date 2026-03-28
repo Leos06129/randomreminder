@@ -8,11 +8,17 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart'
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 
+// 方法通道，用于获取 Android 启动参数
+const MethodChannel _launchChannel = MethodChannel('com.reminder.randomreminder/launch');
+
 // ─────────────────────────────────────────────
 // 全局通知插件
 // ─────────────────────────────────────────────
 final fln.FlutterLocalNotificationsPlugin _notifications =
     fln.FlutterLocalNotificationsPlugin();
+
+// 随机数生成器（全局共享）
+final Random _rng = Random();
 
 // ─────────────────────────────────────────────
 // 前台任务回调（在独立 Isolate 运行，app 后台/锁屏时依然工作）
@@ -57,8 +63,7 @@ class ReminderTaskHandler extends TaskHandler {
   void onReceiveData(Object data) {}
 
   void _scheduleNext() {
-    final rng = Random();
-    _waitSeconds = rng.nextInt(31) + 10; // 10~40 秒
+    _waitSeconds = _rng.nextInt(31) + 10; // 10~40 秒
     FlutterForegroundTask.updateService(
       notificationTitle: '随机提醒运行中',
       notificationText: '下次提醒：$_waitSeconds 秒后',
@@ -91,14 +96,15 @@ class ReminderTaskHandler extends TaskHandler {
     final line1 = prefs.getString('line1') ?? '记得喝水 💧';
     final line2 = prefs.getString('line2') ?? '站起来活动一下 🚶';
 
-    // 使用高优先级 + fullScreenIntent 实现锁屏全屏弹出
-    final androidDetails = fln.AndroidNotificationDetails(
+    // 创建指向 FullScreenActivity 的 fullScreenIntent
+    // 使用 Android 的 Intent 来构建
+    const androidDetails = fln.AndroidNotificationDetails(
       'reminder_channel',
       '随机提醒',
       channelDescription: '随机提醒全屏通知',
       importance: fln.Importance.max,
-      priority: fln.Priority.max,      // 最高优先级
-      fullScreenIntent: true,         // 全屏意图，锁屏时唤屏
+      priority: fln.Priority.max,  // 最高优先级
+      fullScreenIntent: true,       // 全屏意图，锁屏时唤屏
       category: fln.AndroidNotificationCategory.alarm,
       visibility: fln.NotificationVisibility.public,
       timeoutAfter: 5000,
@@ -246,11 +252,31 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final details = await _notifications.getNotificationAppLaunchDetails();
     if (details != null && details.didNotificationLaunchApp && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ReminderOverlayPage()),
-        );
+        _showFullScreenReminder();
       });
     }
+    
+    // 检查是否是全屏模式启动（通过方法通道获取 Android 传递的参数）
+    _checkFullScreenLaunch();
+  }
+  
+  Future<void> _checkFullScreenLaunch() async {
+    try {
+      final result = await _launchChannel.invokeMethod<bool>('isFullScreen');
+      if (result == true && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showFullScreenReminder();
+        });
+      }
+    } catch (e) {
+      // 忽略错误，可能是非 Android 平台
+    }
+  }
+  
+  void _showFullScreenReminder() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ReminderOverlayPage()),
+    );
   }
 
   @override
@@ -266,8 +292,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _loadSettings() async {
     final p = await SharedPreferences.getInstance();
     setState(() {
-      _line1.text = p.getString('line1') ?? '时时彻知无常！';
-      _line2.text = p.getString('line2') ?? '刻刻精勤觉知！';
+      _line1.text = p.getString('line1') ?? '记得喝水 💧';
+      _line2.text = p.getString('line2') ?? '站起来活动一下 🚶';
     });
   }
 
@@ -320,13 +346,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   void _startUiCountdown() {
     _uiTimer?.cancel();
+    // 初始倒计时使用随机 10~40 秒
+    _countdownSeconds = _rng.nextInt(31) + 10;
     _uiTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!_isRunning) return;
       setState(() {
-        if (_countdownSeconds > 0) _countdownSeconds--;
+        if (_countdownSeconds > 0) {
+          _countdownSeconds--;
+        } else {
+          // 倒计时结束，重新生成随机倒计时
+          _countdownSeconds = _rng.nextInt(31) + 10;
+        }
       });
     });
-    setState(() => _countdownSeconds = 25);
   }
 
   String _fmt(int s) {
@@ -612,8 +644,7 @@ class _ReminderOverlayPageState extends State<ReminderOverlayPage>
                       fontSize: _fontSize1,
                       fontWeight: FontWeight.bold,
                       shadows: [
-                        Shadow(
-                            blurRadius: 12, color: _color1.withOpacity(0.7))
+                        Shadow(blurRadius: 12, color: _color1.withOpacity(0.7))
                       ],
                     ),
                   ),
@@ -631,8 +662,7 @@ class _ReminderOverlayPageState extends State<ReminderOverlayPage>
                       fontSize: _fontSize2,
                       fontWeight: FontWeight.bold,
                       shadows: [
-                        Shadow(
-                            blurRadius: 12, color: _color2.withOpacity(0.7))
+                        Shadow(blurRadius: 12, color: _color2.withOpacity(0.7))
                       ],
                     ),
                   ),
