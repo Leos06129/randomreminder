@@ -40,6 +40,25 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- 全屏通知启动 -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:scheme="randomreminder"/>
+            </intent-filter>
+        </activity>
+
+        <!-- 全屏提醒 Activity -->
+        <activity
+            android:name="com.reminder.randomreminder.FullScreenActivity"
+            android:exported="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:screenOrientation="portrait">
         </activity>
 
         <!-- flutter_foreground_task 前台服务（真正保证后台运行） -->
